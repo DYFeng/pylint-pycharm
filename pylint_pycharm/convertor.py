@@ -7,13 +7,14 @@ import sys, os
 import subprocess
 import re
 
-MESSAGE_PATTERN = r"^(?P<filename>[^:]*):(?P<line_number>\d+): (?P<description>.*)"
-PYCHARM_MESSAGE_FORMAT = "%(full_path)s:%(line_number)s:0: %(description)s"
+MESSAGE_PATTERN = r"^(?P<filename>[^:]*):(?P<line_number>\d+):(?P<column_number>\d+): (?P<description>.*)"
+PYCHARM_MESSAGE_FORMAT = "%(full_path)s:%(line_number)s:%(column_number)s: %(description)s"
 
 HELP_TEXT = "Please read README file for more information"
 # HELP_TEXT = open(os.path.join("..", "README")).read()
 
 EXCEPTION_MESSAGE_TEMPLATE = "Error: %(error_message)s\n%(help_text)s"
+
 
 def convert(args, out_stream):
     """
@@ -32,27 +33,27 @@ def convert(args, out_stream):
         pylint_args = parse_pylint_args(args)
 
         # add --output-format argument
-        add_arg_to_list(pylint_args, "--output-format", "parseable")
-
+        add_arg_to_list(pylint_args, '--msg-template', '{path}:{line}:{column}: [{msg_id}({symbol}), {obj}] {msg}')
 
 
         #format command to run in subprocess
         command = format_command_for_process(module_name, pylint_args, virtualenv_path)
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         pylint_output = process.stdout.read()
-
         #parse result
         output_text = parse_output(root_path, pylint_output)
         out_stream.write(output_text)
     except PylintPycharmException as ex:
         out_stream.write(EXCEPTION_MESSAGE_TEMPLATE %
-                     {"error_message": ex.message, "help_text": HELP_TEXT})
+                         {"error_message": ex.message, "help_text": HELP_TEXT})
+
 
 def get_root_path(module_name):
     if os.path.isfile(module_name):
         return os.path.abspath(os.path.dirname(module_name))
     else:
         return os.path.abspath(module_name)
+
 
 def pop_arg_from_list(args, name):
     new_args = []
@@ -64,9 +65,10 @@ def pop_arg_from_list(args, name):
             new_args.append(arg)
     return result
 
+
 def add_arg_to_list(args, name, value):
     idx = -1
-    param = "%s=%s" % (name, value)
+    param = "%s='%s'" % (name, value)
     for i, arg in enumerate(args):
         if arg.startswith(name):
             idx = i
@@ -75,6 +77,7 @@ def add_arg_to_list(args, name, value):
     else:
         args.append(param)
 
+
 def parse_module_name(args):
     """
     Search and return module or package name from list of arguments
@@ -82,9 +85,10 @@ def parse_module_name(args):
     module_names = [arg for arg in args[1:] if not arg.startswith("--")]
     if not module_names:
         raise PylintPycharmException("Can not find module or package name for analyse")
-    if len(module_names)>1:
+    if len(module_names) > 1:
         raise PylintPycharmException("More than one module or package name")
     return module_names[0]
+
 
 def parse_pylint_args(args):
     """
@@ -92,6 +96,7 @@ def parse_pylint_args(args):
     """
     return [arg for arg in args
             if (arg.startswith("--") and (not arg.startswith("--virtualenv")))]
+
 
 def format_command_for_process(module_name, pylint_args, virtualenv_path=None):
     """
@@ -116,7 +121,7 @@ def parse_output(root_path, txt):
         if ms:
             full_path = os.path.join(root_path, ms.group(1))
             data = {"full_path": full_path, "line_number": ms.group("line_number"),
-                    "description": ms.group("description")}
+                    "column_number": ms.group("column_number"), "description": ms.group("description")}
             result.append(PYCHARM_MESSAGE_FORMAT % data)
         else:
             result.append(line)
@@ -125,6 +130,7 @@ def parse_output(root_path, txt):
 
 class PylintPycharmException(Exception):
     pass
+
 
 if __name__ == "__main__":
     convert(sys.argv, sys.stdout)

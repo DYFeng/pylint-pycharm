@@ -13,12 +13,15 @@ class AcceptanceTest(TestCase):
     """
     Acceptance tests for pylint to pycharm parser
     """
+
     def test_success(self):
         """
         successful scenario
         """
         command = "python convertor.py sample.py --reports=n"
-        expected_result = "%s/sample.py:6:0: [C] More than one statement on a single line\n" % PROJECT_FOLDER
+        expected_result = """************* Module pylint_pycharm.sample
+%s/sample.py:6:6: [C0321(multiple-statements), ] More than one statement on a single line
+""" % PROJECT_FOLDER
         pros = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         result = pros.stdout.read()
         self.assertEqual(result, expected_result)
@@ -28,30 +31,38 @@ class AcceptanceTest(TestCase):
         successful scenario
         """
         command = "python convertor.py sample_package --reports=n"
-        expected_result = "%s/sample_package/sample_module.py:6:0: [C] More than one statement on a single line\n" % PROJECT_FOLDER
+        # expected_result = "%s/sample_package/sample_module.py:6:0: [C] More than one statement on a single line\n" % PROJECT_FOLDER
+        expected_result = """************* Module pylint_pycharm.sample_package.sample_module
+%s/sample_package/sample_module.py:6:6: [C0321(multiple-statements), ] More than one statement on a single line
+""" % PROJECT_FOLDER
         pros = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         result = pros.stdout.read()
         self.assertEqual(result, expected_result)
 
-        
+
 class MainTest(TestCase):
     """
     tests for convert.convert function
     """
+
     def test_success(self):
         """
         successful scenario
         """
         import convertor, StringIO
+
         io = StringIO.StringIO()
-        args = ["convertor.py", "sample.py", "--reports=n",  "--output-format=parseable"]
-        expected_result = "%s/sample.py:6:0: [C] More than one statement on a single line\n" % PROJECT_FOLDER
+        args = ["convertor.py", "sample.py", "--reports=n"]
+        expected_result = """************* Module pylint_pycharm.sample
+%s/sample.py:6:6: [C0321(multiple-statements), ] More than one statement on a single line
+""" % PROJECT_FOLDER
         convertor.convert(args, io)
         result = io.getvalue()
         self.assertEqual(expected_result, result)
 
     def test_error(self):
         import convertor, StringIO
+
         help_text = "This is help test"
         convertor.HELP_TEXT = help_text
         original_parse_module_name = convertor.parse_module_name
@@ -60,15 +71,15 @@ class MainTest(TestCase):
         convertor.convert([], io)
         result = io.getvalue()
         convertor.parse_module_name = original_parse_module_name
-        expected_result = "Error: exception\n"+help_text
+        expected_result = "Error: exception\n" + help_text
         self.assertEqual(expected_result, result)
 
 
     @staticmethod
     def parse_module_name_mock(_):
         from convertor import PylintPycharmException
-        raise PylintPycharmException("exception")
 
+        raise PylintPycharmException("exception")
 
 
 class ParseModuleNameTests(TestCase):
@@ -78,6 +89,7 @@ class ParseModuleNameTests(TestCase):
 
     def setUp(self):
         import convertor
+
         self.parse_module_name = convertor.parse_module_name
         self.PylintPycharmException = convertor.PylintPycharmException
 
@@ -112,14 +124,17 @@ class ParseModuleNameTests(TestCase):
         except self.PylintPycharmException:
             pass
 
+
 class ParsePylintArgsTests(TestCase):
     """
     test of convert.parse_pylint_args function
     """
+
     def setUp(self):
         import convertor
+
         self.parse_pylint_args = convertor.parse_pylint_args
-        
+
     def test_success(self):
         """
         success scenario
@@ -136,6 +151,7 @@ class ParsePylintArgsTests(TestCase):
         result = self.parse_pylint_args(args)
         self.assertEquals(result, ["--param2=test2"])
 
+
 class FormatCommandForProcessTest(TestCase):
     """
     tests for convert.parse_pylint_args function format_command_for_process
@@ -143,6 +159,7 @@ class FormatCommandForProcessTest(TestCase):
 
     def setUp(self):
         import convertor
+
         self.format_command_for_process = convertor.format_command_for_process
 
     def test_success(self):
@@ -160,20 +177,24 @@ class FormatCommandForProcessTest(TestCase):
         expected = ". virtual_path/bin/activate && pylint module_name arg1 arg2"
         self.assertEqual(result, expected)
 
+
 class ParseOutputTest(TestCase):
     """
     tests for convert.parse_output function
     """
+
     def test_success(self):
         """
         Success scenario
         """
         import convertor
+
         root_path = "root_path"
-        txt="filename:7: descr1\nsummary"
-        expected_result="root_path/filename:7:0: descr1\nsummary"
+        txt = "filename:7:0: descr1\nsummary"
+        expected_result = "root_path/filename:7:0: descr1\nsummary"
         result = convertor.parse_output(root_path, txt)
         self.assertEqual(result, expected_result)
+
 
 class GetRootPathTest(TestCase):
     """
@@ -182,12 +203,14 @@ class GetRootPathTest(TestCase):
 
     def test_path_is_file(self):
         from convertor import get_root_path
+
         folder = get_root_path("sample.py")
         expected = PROJECT_FOLDER
         self.assertEqual(expected, folder)
 
     def test_path_is_directory(self):
         from convertor import get_root_path
+
         folder = get_root_path("sample_package")
         expected = "%s/sample_package" % PROJECT_FOLDER
         self.assertEqual(expected, folder)
